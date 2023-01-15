@@ -1,3 +1,11 @@
+/admin.db
+/config.py
+/sqlite.py
+/venv
+/_*
+/.idea
+.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
