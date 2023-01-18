@@ -1,6 +1,4 @@
-/admin.db
-/config.py
-/sqlite.py
+/jokes.db
 /venv
 /_*
 /.idea
