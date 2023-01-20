@@ -18,10 +18,11 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(me
 logger.addHandler(handler)
 
 load_dotenv()
-# bot = discord.Bot()
-bot = commands.Bot(help_command=commands.DefaultHelpCommand())
+const_guild_id = int(os.getenv('GUILD_ID', '0'))
+bot = discord.Bot(debug_guilds=[const_guild_id])
+# bot = commands.Bot(help_command=commands.DefaultHelpCommand(), debug_guilds=[const_guild_id])
 
-dicer = bot.create_group(name="dicer", description="roll dice!", guild_ids=[os.getenv('GUILD_ID')])
+# dice = bot.create_group(name="dice", description="roll dice!", guild_ids=[const_guild_id])
 
 conn = sqlite3.connect('jokes.db')
 cursor = conn.cursor()
@@ -58,6 +59,7 @@ async def on_ready():
     print(datetime.datetime.now(), 'INFO', 'Number of servers connected to:', bot.guilds)
     await bot.change_presence(activity=discord.Activity(name='dice rolling!',
                                                                type=discord.ActivityType.competing))
+    print(const_guild_id)
     await asyncio.sleep(10)
     # start number of jokes update loop
     update_jokes.start()
@@ -89,7 +91,7 @@ async def help(ctx: discord.ApplicationContext, args: str):
         )
         help_embed.add_field(
             name="Details",
-            value="Type `\/help <command name>` for more details about each command.",
+            value="Type `/help <command name>` for more details about each command.",
             inline=False
         )
     elif args in command_names_list:
@@ -115,7 +117,7 @@ async def on_command_error(ctx: discord.ApplicationContext, error):
 
 # USER COMMANDS AND ERRORS HANDLERS
 # JOKE COMMAND
-@dicer.command(name="joke", description=cmd_description["joke"], guild_ids=[os.getenv('GUILD_ID')])
+@bot.slash_command(name="joke", description=cmd_description["joke"])
 async def joke(ctx: discord.ApplicationContext):
     random_joke_number = random.randint(1, number_of_jokes)
     sql_joke = "SELECT joke_text FROM jokes WHERE joke_id=?;"
@@ -394,7 +396,7 @@ async def update_jokes():
     return number_of_jokes
 
 # ROLL COMMAND
-@dicer.command(name="roller", description=cmd_description["roll"], guild_ids=[os.getenv('GUILD_ID')])
+@bot.slash_command(name="roller", description=cmd_description["roll"], guild_ids=[const_guild_id], guild_only=True)
 async def roller(ctx: discord.ApplicationContext, *arg):
     logger.debug(f'{arg}')
     all_dice = list(arg)
