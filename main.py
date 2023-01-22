@@ -19,8 +19,8 @@ logger.addHandler(handler)
 
 load_dotenv()
 const_guild_id = int(os.getenv('GUILD_ID', '0'))
-bot = discord.Bot(debug_guilds=[const_guild_id])
-# bot = commands.Bot(help_command=commands.DefaultHelpCommand(), debug_guilds=[const_guild_id])
+# bot = discord.Bot(debug_guilds=[const_guild_id])
+bot = commands.Bot(help_command=commands.DefaultHelpCommand(), debug_guilds=[const_guild_id])
 
 # dice = bot.create_group(name="dice", description="roll dice!", guild_ids=[const_guild_id])
 
@@ -75,9 +75,6 @@ async def hello(ctx: discord.ApplicationContext):
                    f'Please, ask "/help" to list commands with short description. '
                    f'Also, ask "/help <command_name>" for more info about each command and examples.')
 
-@bot.slash_command(name = "hell", description = "Say hello to the bot")
-async def hell(ctx: discord.ApplicationContext):
-    await ctx.respond("Go To HELL")
 """
 @dice_bot.command(name = "help", description="Command descriptions")
 async def help(ctx: discord.ApplicationContext, args: str):
@@ -117,7 +114,7 @@ async def on_command_error(ctx: discord.ApplicationContext, error):
 
 # USER COMMANDS AND ERRORS HANDLERS
 # JOKE COMMAND
-@bot.slash_command(name="joke", description=cmd_description["joke"])
+@bot.slash_command(name="joke", description=cmd_description["joke"], guild_ids=[const_guild_id])
 async def joke(ctx: discord.ApplicationContext):
     random_joke_number = random.randint(1, number_of_jokes)
     sql_joke = "SELECT joke_text FROM jokes WHERE joke_id=?;"
@@ -374,7 +371,8 @@ def dice_maker(*args):
 # on connect actions
 @bot.event
 async def on_connect():
-    # log connection info
+    # log connection inf
+    await bot.sync_commands()
     print(datetime.datetime.now(), 'INFO', 'Bot connected')
 
 
@@ -396,21 +394,23 @@ async def update_jokes():
     return number_of_jokes
 
 # ROLL COMMAND
-@bot.slash_command(name="roller", description=cmd_description["roll"], guild_ids=[const_guild_id], guild_only=True)
-async def roller(ctx: discord.ApplicationContext, *arg):
-    logger.debug(f'{arg}')
-    all_dice = list(arg)
-    logger.debug(all_dice)
-    await ctx.respond(f'{arg}')
-"""
-    logging.info(f'{arg}')
-    logging.info(f'{all_dice}')
+@bot.slash_command(name="roller", description=cmd_description["roll"], guild_ids=[const_guild_id])
+async def roller(ctx: discord.ApplicationContext, roll_string: str):
+    roll_string = roll_string.replace(" ", "")
+    logger.debug("roller called")
+    logger.debug(f'{roll_string}')
+    # TODO: this split eliminates + or -. Leave them to be computed.
+    # Should I generate a stack calculator?
+    all_dice = re.split(r'\+|-', roll_string)
+    logger.debug(f'{all_dice}')
     dice_number = len(all_dice)
     if dice_number == 0:
         await ctx.respond(f'specify valid dice, please.\n'
                        f'Try something like: ```/roll 2d8+1```')
     check_limit(dice_number, limits["dice"])
     table_body = []
+    await ctx.respond(f'{all_dice}')
+"""
 
     for dice in all_dice:
         if dice in spec_dice:
@@ -484,6 +484,8 @@ async def roller_error(ctx, error):
     if isinstance(error, commands.MissingRequiredArgument):
         await ctx.respond(f'specify valid dice, please.\n'
                        f'Try something like: ```/roller 2d8+1```')
+    else:
+        await ctx.respond(f'{error}')
 
 # bot start
 bot.run(os.getenv('TOKEN'))
