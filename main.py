@@ -35,7 +35,7 @@ number_of_jokes = 1
 cmd_description = {
     "hello": "Dice Roller greetings you and tell a little about itself.",
     "joke": "Bot post a random DnD joke from database.",
-    "roll": f"linear sum of multiple dices and modifier. Ex) d10 5d10[-2] 2d100 fate d123[+5] Ed10[-2]"
+    "rolls": f"linear sum of multiple dices and modifier. Ex) d10 5d10[-2] 2d100 fate d123[+5] Ed10[-2]"
 
 }
 missing_descriptions = f"""
@@ -48,7 +48,7 @@ missing_descriptions = f"""
             - co-co-combo: d10 5d10[-2] 2d100 date d123[+5] Ed10[-2]","""
 
 cmd_usage = {
-    "roll": "dice_1 [dice_2 ... dice_n]"
+    "rolls": "dice_1 [dice_2 ... dice_n]"
 }
 
 @bot.event
@@ -130,10 +130,6 @@ async def joke(ctx: discord.ApplicationContext):
 
 suffix_verbs = ['pass']
 mod_types = ['pass', 'add', 'sub']
-spec_dice = {
-    "fate": "4dF",
-    "explode": "Ed6"
-}
 
 limits = {
     "dice": 20,
@@ -393,11 +389,11 @@ async def update_jokes():
     print(datetime.datetime.now(), 'INFO', 'Jokes number updated, current number:', number_of_jokes)
     return number_of_jokes
 
-# ROLL COMMAND
-@bot.slash_command(name="roller", description=cmd_description["roll"], guild_ids=[const_guild_id])
-async def roller(ctx: discord.ApplicationContext, roll_string: str):
+# ROLLS COMMAND
+@bot.slash_command(name="rolls", description=cmd_description["roll"], guild_ids=[const_guild_id])
+async def rolls(ctx: discord.ApplicationContext, roll_string: str):
     roll_string = roll_string.replace(" ", "")
-    logger.debug("roller called")
+    logger.debug("roll called")
     logger.debug(f'{roll_string}')
     # TODO: this split eliminates + or -. Leave them to be computed.
     # Should I generate a stack calculator?
@@ -413,8 +409,6 @@ async def roller(ctx: discord.ApplicationContext, roll_string: str):
 """
 
     for dice in all_dice:
-        if dice in spec_dice:
-            dice = spec_dice[dice]
 
         dice_raw, adds = split_dice_with_mod(dice)
         dice_rolls, dice_edge, dice_type = ident_dice(dice_raw)
@@ -468,8 +462,8 @@ async def roller(ctx: discord.ApplicationContext, roll_string: str):
 
 
 # ROLL ERRORS HANDLER
-@roller.error
-async def roller_error(ctx, error):
+@rolls.error
+async def rolls_error(ctx, error):
     if isinstance(error, commands.BadArgument):
         await ctx.respond(f'wrong dice.\n'
                        f'Try something like: ```/roller 3d10 d10-1 3d8+1 d100-10```')
