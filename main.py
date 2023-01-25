@@ -186,11 +186,14 @@ def split_dice_with_mod(dice):
                 adds.append(add)
         check_limit(len(adds), limits["adds"])
     first_dice_sign = '+'
-    if dice_without_adds[0] in ('+', '-'):
+    if len(dice_without_adds) > 0 and dice_without_adds[0] in ('+', '-'):
         first_dice_sign = dice_without_adds[0]
         dice_without_adds = dice_without_adds[1:]
     if len(dice_without_adds) > 0 and dice_without_adds[0] == 'd':
         dice_without_adds = '1' + dice_without_adds
+    for i in range(len(adds)):
+        if len(adds[i][1]) > 0 and adds[i][1][0] == 'd':
+            adds[i][1] = 'd' + adds[i][1]
     return dice_without_adds, [first_dice_sign, dice_without_adds] + adds
 
 
