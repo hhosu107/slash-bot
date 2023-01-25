@@ -185,7 +185,13 @@ def split_dice_with_mod(dice):
             if add[1] != '':
                 adds.append(add)
         check_limit(len(adds), limits["adds"])
-    return dice_without_adds, adds
+    first_dice_sign = '+'
+    if dice_without_adds[0] in ('+', '-'):
+        first_dice_sign = dice_without_adds[0]
+        dice_without_adds = dice_without_adds[1:]
+    if len(dice_without_adds) > 0 and dice_without_adds[0] == 'd':
+        dice_without_adds = '1' + dice_without_adds
+    return dice_without_adds, [first_dice_sign, dice_without_adds] + adds
 
 
 # ident explode rolls
@@ -397,6 +403,13 @@ async def rolls(ctx: discord.ApplicationContext, roll_string: str):
     logger.debug(f'{roll_string}')
     # TODO: this split eliminates + or -. Leave them to be computed.
     # Should I generate a stack calculator?
+    # After `split_dice_with_mod`, we get `xdy` as `dice_raw`, and a list of
+    # tuple as `adds`. For each element in `adds`, the first element is sign
+    # ('+' | '-'); the second element is either a dice or constant.
+    # This kind of parsing is troublesome. It doesn't recognize the following
+    # type of inputs:
+    # +4d6, 3+4d6, -4d6, d6, etc.
+    # How can I convert?
     all_dice = re.split(r'\+|-', roll_string)
     logger.debug(f'{all_dice}')
     dice_number = len(all_dice)
