@@ -343,15 +343,6 @@ async def update_jokes():
 @bot.slash_command(name="rolls", description=cmd_description["rolls"], guild_ids=[const_guild_id])
 async def rolls(ctx: discord.ApplicationContext, roll_string: str):
     roll_string = roll_string.replace(" ", "")
-    # TODO: this split eliminates + or -. Leave them to be computed.
-    # Should I generate a stack calculator?
-    # After `split_dice_with_mod`, we get `xdy` as `dice_raw`, and a list of
-    # tuple as `adds`. For each element in `adds`, the first element is sign
-    # ('+' | '-'); the second element is either a dice or constant.
-    # This kind of parsing is troublesome. It doesn't recognize the following
-    # type of inputs:
-    # +4d6, 3+4d6, -4d6, d6, etc.
-    # How can I convert?
     table_body = []
 
     adds = split_dice_with_mod(roll_string)
@@ -394,6 +385,8 @@ async def rolls(ctx: discord.ApplicationContext, roll_string: str):
 
     output = create_table(table_body)
     print(datetime.datetime.now(), 'INFO', f'Roll {roll_string} result: {result}')
+
+    # TODO: Update database.
 
     await ctx.respond(f'```{output}```')
 
