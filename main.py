@@ -7,6 +7,7 @@ import os
 import random
 import re
 import sqlite3
+from typing import List, Set, Any
 
 from dotenv import load_dotenv
 from table2ascii import table2ascii as t2a, Alignment
@@ -35,16 +36,13 @@ number_of_jokes = 1
 cmd_description = {
     "hello": "Dice Roller greetings you and tell a little about itself.",
     "joke": "Bot post a random DnD joke from database.",
-    "rolls": f"linear sum of multiple dices and modifier. Ex) d10 5d10[-2] 2d100 fate d123[+5] Ed10[-2]"
-
+    "rolls": f"linear sum of multiple dices and modifier. Ex) d10 + 5d6 - 2d100 + 4 - 2d4"
 }
 missing_descriptions = f"""
             - single die, single roll: d20[+4] \
             - single die, multiple rolls: 10d4[+2] \
             - multiple dice, single roll: d4[-3] d8[-5] d20[+3] \
             - multiple dice, multiple rolls: d12[+3] 3d6[-2] 4d8[+5] \
-            - fate dice: fate 4df[+2] 6dF[-5] \
-            - exploding dice: explode Ed20[-4] Ed6[+1] \
             - co-co-combo: d10 5d10[-2] 2d100 date d123[+5] Ed10[-2]","""
 
 cmd_usage = {
@@ -194,21 +192,8 @@ def split_dice_with_mod(dice):
     for i in range(len(adds)):
         if len(adds[i][1]) > 0 and adds[i][1][0] == 'd':
             adds[i][1] = 'd' + adds[i][1]
-    return dice_without_adds, [first_dice_sign, dice_without_adds] + adds
-
-
-# ident explode rolls
-def ident_explode(rolls):
-    rolls = rolls.lower()
-    explode_rolls = rolls.split('e')
-    if len(explode_rolls) != 2:
-        raise commands.BadArgument
-    number_of_rolls = explode_rolls[1]
-    if number_of_rolls == '':
-        number_of_rolls = 1
-    number_of_rolls = check_int(number_of_rolls)
-    return number_of_rolls
-
+    adds.insert(0, [first_dice_sign, dice_without_adds])
+    return adds
 
 # split and check dice for rolls and edges
 def ident_dice(dice):
@@ -218,63 +203,24 @@ def ident_dice(dice):
         raise commands.BadArgument
     dice_rolls = rolls_and_edges[0]
     dice_edge = rolls_and_edges[1]
-    if dice_rolls[0].lower() == 'e':
-        explode_rolls = ident_explode(dice_rolls)
-        dice_type.append('explode')
-        dice_rolls = explode_rolls
-        check_limit(dice_rolls, limits["roll"])
-    else:
-        if dice_rolls == '':
-            dice_rolls = 1
-        dice_rolls = check_int(dice_rolls)
-        check_one(dice_rolls)
-        check_limit(dice_rolls, limits["roll"])
-    if dice_edge.lower() == 'f':
-        dice_type.append('fate')
-        dice_edge = dice_edge.upper()
-    else:
-        dice_edge = check_int(dice_edge)
-        check_one(dice_edge)
-        check_limit(dice_edge, limits["edge"])
+    if dice_rolls == '':
+        dice_rolls = 1
+    dice_rolls = check_int(dice_rolls)
+    check_one(dice_rolls)
+    check_limit(dice_rolls, limits["roll"])
+    dice_edge = check_int(dice_edge)
+    check_one(dice_edge)
+    check_limit(dice_edge, limits["edge"])
     return dice_rolls, dice_edge, dice_type
 
 
 # roll dice
 def dice_roll(rolls, edge):
-    dice_roll_result = []
-    for counts in range(1, rolls + 1):
+    dice_roll_result : List[int] = []
+    for _ in range(1, rolls + 1):
         roll_result = random.randint(1, edge)
         dice_roll_result.append(roll_result)
     return dice_roll_result
-
-
-# fate roll
-def fate_roll(rolls):
-    dice_roll_result = []
-    for counts in range(1, rolls + 1):
-        roll_result = random.choices(["+", ".", "-"])
-        dice_roll_result += roll_result
-    return dice_roll_result
-
-
-def fate_result(dice_result):
-    total_result = dice_result.count('+') - dice_result.count('-')
-    return total_result
-
-
-# explode roll
-def explode_roll(rolls, edge):
-    if edge < 2:
-        raise commands.BadArgument
-    dice_roll_result = []
-    for counts in range(1, rolls + 1):
-        check = edge
-        while check == edge:
-            roll_result = random.randint(1, edge)
-            dice_roll_result.append(roll_result)
-            check = roll_result
-    return dice_roll_result
-
 
 # summarize result
 def calc_result(dice_result):
@@ -289,12 +235,6 @@ def add_mod_result(total_result, mod_amount):
 
 
 def sub_mod_result(total_result, mod_amount):
-    total_mod_result = total_result - mod_amount
-    total_mod_result = check_subzero(total_mod_result)
-    return total_mod_result
-
-
-def sub_mod_fate(total_result, mod_amount):
     total_mod_result = total_result - mod_amount
     return total_mod_result
 
@@ -318,7 +258,8 @@ def create_table(table_body):
     columns = len(table_header) - 1
     output = t2a(
         header=table_header,
-        body=table_body,
+        body=table_body[:-1],
+        footer=table_body[-1],
         first_col_heading=True,
         alignments=[Alignment.LEFT] + [Alignment.CENTER] * columns
     )
@@ -413,7 +354,7 @@ async def rolls(ctx: discord.ApplicationContext, roll_string: str):
     # type of inputs:
     # +4d6, 3+4d6, -4d6, d6, etc.
     # How can I convert?
-    all_dice = re.split(r'\+|-', roll_string)
+    all_dice = re.split(r'([+-])', roll_string)
     logger.debug(f'{all_dice}')
     dice_number = len(all_dice)
     if dice_number == 0:
@@ -421,60 +362,49 @@ async def rolls(ctx: discord.ApplicationContext, roll_string: str):
                        f'Try something like: ```/roll 2d8+1```')
     check_limit(dice_number, limits["dice"])
     table_body = []
-    await ctx.respond(f'{all_dice}')
-"""
 
-    for dice in all_dice:
+    adds = split_dice_with_mod(all_dice)
 
-        dice_raw, adds = split_dice_with_mod(dice)
-        dice_rolls, dice_edge, dice_type = ident_dice(dice_raw)
-        dice_type_len = len(dice_type)
-
-        if dice_type_len == 0:
-            dice_roll_result = dice_roll(dice_rolls, dice_edge)
-            result = calc_result(dice_roll_result)
-        elif dice_type_len == 1 and 'fate' in dice_type:
-            dice_roll_result = fate_roll(dice_rolls)
-            result = fate_result(dice_roll_result)
-        elif dice_type_len == 1 and 'explode' in dice_type:
-            dice_roll_result = explode_roll(dice_rolls, dice_edge)
-            dice_rolls = 'E' + str(dice_rolls)
-            result = calc_result(dice_roll_result)
-        else:
-            raise commands.BadArgument
-
-        mod_mod = []
-        for add in adds:
-            try:
-                amount = check_int(add[1])
-            except Exception:
-                rolls, edge, d_type = ident_dice(add[1])
-                if len(d_type) != 0:
-                    raise commands.BadArgument
-                d_result = dice_roll(rolls, edge)
-                amount = calc_result(d_result)
+    mod_sum = 0
+    roll_results = []  # List of tuple of (dice, List of rolls, sum)
+    result = 0
+    for add in adds:
+        try:
+            amount = check_int(add[1])
             if add[0] == '+':
-                result = add_mod_result(result, amount)
+                mod_sum += amount
+            else:
+                mod_sum -= amount
+        except Exception:
+            rolls, edge, d_type = ident_dice(add[1])
+            if len(d_type) != 0:
+                raise commands.BadArgument
+            d_result = dice_roll(rolls, edge)
+            amount = calc_result(d_result)
             if add[0] == '-':
-                if 'fate' in dice_type:
-                    result = sub_mod_fate(result, amount)
-                else:
-                    result = sub_mod_result(result, amount)
-            amount_for_table = add[0] + make_short(amount)
-            mod_mod.append(amount_for_table)
+                amount = -1 * amount
+            # Add roll row
+            result = add_mod_result(result, amount)
+            roll_results.append([add[0] + add[1], d_result, amount])
+            table_dice = dice_maker(add[0] + add[1], 'd', make_short(edge))
+            table_dice_roll_result = make_pretty_rolls(rolls)
+            table_result = make_pretty_sum(amount)
+            table_row = create_row(table_dice, table_dice_roll_result, table_result)
+            table_body.append(table_row)
 
-        table_dice = dice_maker(dice_rolls, 'd', make_short(dice_edge))
-        table_dice_roll_result = make_pretty_rolls(dice_roll_result)
-        table_mod_list = make_pretty_rolls(mod_mod)
-        table_result = make_pretty_sum(result)
+    # Add mod row
+    roll_results.append(['mod', '', mod_sum])
+    result += mod_sum
+    table_row = create_row('mod', '', make_pretty_sum(mod_sum))
+    table_body.append(table_row)
 
-        table_row = create_row(table_dice, table_dice_roll_result, table_mod_list, table_result)
-        table_body.append(table_row)
+    # Add result row
+    table_row = create_row('sum', '', make_pretty_sum(result))
+    table_body.append(table_row)
 
     output = create_table(table_body)
-    # send it into chat
-    await ctx.respond(f"```{output}```")
-"""
+
+    await ctx.respond(f'```{output}```')
 
 
 # ROLL ERRORS HANDLER
@@ -493,7 +423,7 @@ async def rolls_error(ctx, error):
                        f'- max modifier is {limits["mod"]}\n```')
     if isinstance(error, commands.MissingRequiredArgument):
         await ctx.respond(f'specify valid dice, please.\n'
-                       f'Try something like: ```/roller 2d8+1```')
+                       f'Try something like: ```/rolls 2d8+1```')
     else:
         await ctx.respond(f'{error}')
 
