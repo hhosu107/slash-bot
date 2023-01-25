@@ -14,7 +14,7 @@ from table2ascii import table2ascii as t2a, Alignment
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
-handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w+')
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
@@ -130,11 +130,10 @@ suffix_verbs = ['pass']
 mod_types = ['pass', 'add', 'sub']
 
 limits = {
-    "dice": 20,
+    "dice": 100,
     "edge": 1000000000,
     "mod": 1000000000,
-    "adds": 3,
-    "prefix": 3,
+    "adds": 10,
     "roll": 50
 }
 
@@ -192,7 +191,8 @@ def split_dice_with_mod(dice):
     for i in range(len(adds)):
         if len(adds[i][1]) > 0 and adds[i][1][0] == 'd':
             adds[i][1] = 'd' + adds[i][1]
-    adds.insert(0, [first_dice_sign, dice_without_adds])
+    if len(dice_without_adds) > 0:
+        adds.insert(0, [first_dice_sign, dice_without_adds])
     return adds
 
 # split and check dice for rolls and edges
@@ -340,11 +340,9 @@ async def update_jokes():
     return number_of_jokes
 
 # ROLLS COMMAND
-@bot.slash_command(name="rolls", description=cmd_description["roll"], guild_ids=[const_guild_id])
+@bot.slash_command(name="rolls", description=cmd_description["rolls"], guild_ids=[const_guild_id])
 async def rolls(ctx: discord.ApplicationContext, roll_string: str):
     roll_string = roll_string.replace(" ", "")
-    logger.debug("roll called")
-    logger.debug(f'{roll_string}')
     # TODO: this split eliminates + or -. Leave them to be computed.
     # Should I generate a stack calculator?
     # After `split_dice_with_mod`, we get `xdy` as `dice_raw`, and a list of
@@ -354,21 +352,14 @@ async def rolls(ctx: discord.ApplicationContext, roll_string: str):
     # type of inputs:
     # +4d6, 3+4d6, -4d6, d6, etc.
     # How can I convert?
-    all_dice = re.split(r'([+-])', roll_string)
-    logger.debug(f'{all_dice}')
-    dice_number = len(all_dice)
-    if dice_number == 0:
-        await ctx.respond(f'specify valid dice, please.\n'
-                       f'Try something like: ```/roll 2d8+1```')
-    check_limit(dice_number, limits["dice"])
     table_body = []
 
-    adds = split_dice_with_mod(all_dice)
+    adds = split_dice_with_mod(roll_string)
 
     mod_sum = 0
     roll_results = []  # List of tuple of (dice, List of rolls, sum)
     result = 0
-    for add in adds:
+    for i, add in enumerate(adds):
         try:
             amount = check_int(add[1])
             if add[0] == '+':
@@ -386,12 +377,11 @@ async def rolls(ctx: discord.ApplicationContext, roll_string: str):
             # Add roll row
             result = add_mod_result(result, amount)
             roll_results.append([add[0] + add[1], d_result, amount])
-            table_dice = dice_maker(add[0] + add[1], 'd', make_short(edge))
-            table_dice_roll_result = make_pretty_rolls(rolls)
+            table_dice = dice_maker(f'{add[0]}{rolls}', 'd', make_short(edge))
+            table_dice_roll_result = make_pretty_rolls(d_result)
             table_result = make_pretty_sum(amount)
             table_row = create_row(table_dice, table_dice_roll_result, table_result)
             table_body.append(table_row)
-
     # Add mod row
     roll_results.append(['mod', '', mod_sum])
     result += mod_sum
@@ -403,6 +393,7 @@ async def rolls(ctx: discord.ApplicationContext, roll_string: str):
     table_body.append(table_row)
 
     output = create_table(table_body)
+    print(datetime.datetime.now(), 'INFO', f'Roll {roll_string} result: {result}')
 
     await ctx.respond(f'```{output}```')
 
@@ -412,12 +403,11 @@ async def rolls(ctx: discord.ApplicationContext, roll_string: str):
 async def rolls_error(ctx, error):
     if isinstance(error, commands.BadArgument):
         await ctx.respond(f'wrong dice.\n'
-                       f'Try something like: ```/roller 3d10 d10-1 3d8+1 d100-10```')
+                       f'Try something like: ```/rolls -3d10+3d8+1-d100```')
     if isinstance(error, commands.ArgumentParsingError):
         await ctx.respond(f'specify valid dice parameters, please.\n'
                        f'```Current limits:\n'
                        f'- max dice number is {limits["dice"]}\n'
-                       f'- max rolls per dice is {limits["roll"]}\n'
                        f'- max dice edge is {limits["edge"]}\n'
                        f'- max number of modifiers is {limits["adds"]}\n'
                        f'- max modifier is {limits["mod"]}\n```')
