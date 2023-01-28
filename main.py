@@ -10,13 +10,21 @@ import sqlite3
 from typing import List, Set, Any
 
 from dotenv import load_dotenv
+from sqlalchemy import select, update, insert
 from table2ascii import table2ascii as t2a, Alignment
 
+from database import models
+from database.database import SessionLocal, engine
+
+# Set logger
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w+')
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
+
+# Set database
+models.Base.metadata.create_all(bind=engine)
 
 load_dotenv()
 const_guild_id = int(os.getenv('GUILD_ID', '0'))
@@ -24,6 +32,13 @@ const_guild_id = int(os.getenv('GUILD_ID', '0'))
 bot = commands.Bot(help_command=commands.DefaultHelpCommand(), debug_guilds=[const_guild_id])
 
 # dice = bot.create_group(name="dice", description="roll dice!", guild_ids=[const_guild_id])
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 conn = sqlite3.connect('jokes.db')
 cursor = conn.cursor()
@@ -36,7 +51,8 @@ number_of_jokes = 1
 cmd_description = {
     "hello": "Dice Roller greetings you and tell a little about itself.",
     "joke": "Bot post a random DnD joke from database.",
-    "rolls": f"linear sum of multiple dices and modifier. Ex) d10 + 5d6 - 2d100 + 4 - 2d4"
+    "rolls": f"linear sum of multiple dices and modifier. Ex) d10 + 5d6 - 2d100 + 4 - 2d4",
+    "db_test": "debug"
 }
 missing_descriptions = f"""
             - single die, single roll: d20[+4] \
@@ -350,7 +366,7 @@ async def rolls(ctx: discord.ApplicationContext, roll_string: str):
     mod_sum = 0
     roll_results = []  # List of tuple of (dice, List of rolls, sum)
     result = 0
-    for i, add in enumerate(adds):
+    for _, add in enumerate(adds):
         try:
             amount = check_int(add[1])
             if add[0] == '+':
@@ -409,6 +425,14 @@ async def rolls_error(ctx, error):
                        f'Try something like: ```/rolls 2d8+1```')
     else:
         await ctx.respond(f'{error}')
+
+# ROLLS COMMAND
+@bot.slash_command(name="db_test", description=cmd_description["db_test"], guild_ids=[const_guild_id])
+async def db_test(ctx: discord.ApplicationContext, roll_string: str):
+    db = next(get_db())
+    stmt = select(models.GuildTable.guild_id)
+    guild_ids = db.execute(stmt).all()
+    await ctx.respond(f'{guild_ids}')
 
 # bot start
 bot.run(os.getenv('TOKEN'))
