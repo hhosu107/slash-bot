@@ -1,16 +1,18 @@
-import asyncio
-import datetime
-import discord
-from discord.ext import commands, tasks
-import logging
+import json
 import os
 import random
 import re
-import sqlite3
 from typing import List, Set, Any
 
+import asyncio
+import datetime
+import discord
 from dotenv import load_dotenv
-from sqlalchemy import select, update, insert
+from discord.ext import commands, tasks
+import logging
+from sqlalchemy import select, update, insert, func
+from sqlalchemy.sql import exists
+import sqlite3
 from table2ascii import table2ascii as t2a, Alignment
 
 from database import models
@@ -52,6 +54,7 @@ cmd_description = {
     "hello": "Dice Roller greetings you and tell a little about itself.",
     "joke": "Bot post a random DnD joke from database.",
     "rolls": f"linear sum of multiple dices and modifier. Ex) d10 + 5d6 - 2d100 + 4 - 2d4",
+    "user_stat": f"Show user's statistics.",
     "db_test": "debug"
 }
 missing_descriptions = f"""
@@ -355,9 +358,29 @@ async def update_jokes():
     print(datetime.datetime.now(), 'INFO', 'Jokes number updated, current number:', number_of_jokes)
     return number_of_jokes
 
+# Individual roll stat command
+@bot.slash_command(name="user_stat", description=cmd_description["user_stat"], guild_ids=[const_guild_id])
+async def user_stat(ctx: discord.ApplicationContext):
+    db = next(get_db())
+    guild_id = str(ctx.guild_id)
+    user_id = str(ctx.user)
+
+    # Insert or Update guild_table
+    is_exist = db.query(exists().where(models.RollStat.guild_id == guild_id, models.RollStat.user_id == user_id))
+    if not is_exist:
+        db.commit()
+        await ctx.respond(f'```empty```')
+    else:
+        stmt = select(models.RollStat).filter(models.RollStat.guild_id == guild_id, models.RollStat.user_id == user_id)
+        roll_stat = db.execute(stmt).scalars().one()
+        db.commit()
+        await ctx.respond(f'```Roll count: {roll_stat.count_successful_rolls}\nCumulative roll sum: {roll_stat.sum_successful_rolls}```')
+
 # ROLLS COMMAND
 @bot.slash_command(name="rolls", description=cmd_description["rolls"], guild_ids=[const_guild_id])
 async def rolls(ctx: discord.ApplicationContext, roll_string: str):
+    db = next(get_db())
+
     roll_string = roll_string.replace(" ", "")
     table_body = []
 
@@ -402,7 +425,47 @@ async def rolls(ctx: discord.ApplicationContext, roll_string: str):
     output = create_table(table_body)
     print(datetime.datetime.now(), 'INFO', f'Roll {roll_string} result: {result}')
 
-    # TODO: Update database.
+    guild_id = str(ctx.guild_id)
+    guild_name = str(ctx.guild)
+    user_id = str(ctx.user)
+    roll_json_list = [json.dumps({'dice': row[0], 'roll_result': row[1], 'roll_sum': row[2]}) for row in roll_results]
+
+    # Insert or Update guild_table
+    stmt = select(models.GuildTable.guild_id).filter(models.GuildTable.guild_id == guild_id)
+    guild_ids = db.execute(stmt).all()
+    if len(guild_ids) == 0:  # Guild is not registered
+        stmt = insert(models.GuildTable).values(guild_id=guild_id, guild_name=guild_name)
+    else:
+        stmt = update(models.GuildTable).where(models.GuildTable.guild_id == guild_id).values(guild_id=guild_id, guild_name=guild_name)
+    db.execute(stmt)
+
+    # Insert or update guild_table
+    stmt = select(models.UserTable.user_id).filter(models.UserTable.user_id == user_id)
+    user_ids = db.execute(stmt).all()
+    if len(user_ids) == 0:
+        stmt = insert(models.UserTable).values(user_id=user_id)
+        db.execute(stmt)
+
+    # Insert to roll_stat if empty
+    stmt = select(models.RollStat).filter(models.RollStat.guild_id == guild_id, models.RollStat.user_id == user_id)
+    roll_stat = db.execute(stmt).all()
+    if len(roll_stat) == 0:
+        stmt = insert(models.RollStat).values(guild_id=guild_id, user_id=user_id)
+        db.execute(stmt)
+    stmt = select(models.RollStat).filter(models.RollStat.guild_id == guild_id, models.RollStat.user_id == user_id)
+    guid_row = db.execute(stmt).scalars().one()
+    target_guid = guid_row.guid
+
+    # Insert data to roll_log
+    roll_log_stmt = insert(models.RollLog).values(guid=target_guid, roll_string=roll_string, roll_result=roll_json_list, roll_modifier=mod_sum, roll_sum=result)
+    db.execute(roll_log_stmt)
+    # Update roll_stat data
+    curr_count_successful_rolls = guid_row.count_successful_rolls + 1
+    curr_sum_successful_rolls = guid_row.sum_successful_rolls + result
+    update_roll_stat_stmt = update(models.RollStat).where(models.RollStat.guid == target_guid).values(count_successful_rolls=curr_count_successful_rolls, sum_successful_rolls=curr_sum_successful_rolls)
+    db.execute(update_roll_stat_stmt)
+
+    db.commit()
 
     await ctx.respond(f'```{output}```')
 
@@ -425,14 +488,6 @@ async def rolls_error(ctx, error):
                        f'Try something like: ```/rolls 2d8+1```')
     else:
         await ctx.respond(f'{error}')
-
-# ROLLS COMMAND
-@bot.slash_command(name="db_test", description=cmd_description["db_test"], guild_ids=[const_guild_id])
-async def db_test(ctx: discord.ApplicationContext, roll_string: str):
-    db = next(get_db())
-    stmt = select(models.GuildTable.guild_id)
-    guild_ids = db.execute(stmt).all()
-    await ctx.respond(f'{guild_ids}')
 
 # bot start
 bot.run(os.getenv('TOKEN'))
