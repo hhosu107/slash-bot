@@ -31,7 +31,8 @@ models.Base.metadata.create_all(bind=engine)
 load_dotenv()
 const_guild_id = int(os.getenv('GUILD_ID', '0'))
 # bot = discord.Bot(debug_guilds=[const_guild_id])
-bot = commands.Bot(help_command=commands.DefaultHelpCommand(), debug_guilds=[const_guild_id])
+# bot = commands.Bot(help_command=commands.DefaultHelpCommand(), debug_guilds=[const_guild_id])
+bot = commands.Bot(help_command=commands.DefaultHelpCommand())
 
 # dice = bot.create_group(name="dice", description="roll dice!", guild_ids=[const_guild_id])
 
@@ -54,18 +55,7 @@ cmd_description = {
     "hello": "Dice Roller greetings you and tell a little about itself.",
     "joke": "Bot post a random DnD joke from database.",
     "rolls": f"linear sum of multiple dices and modifier. Ex) d10 + 5d6 - 2d100 + 4 - 2d4",
-    "user_stat": f"Show user's statistics.",
-    "db_test": "debug"
-}
-missing_descriptions = f"""
-            - single die, single roll: d20[+4] \
-            - single die, multiple rolls: 10d4[+2] \
-            - multiple dice, single roll: d4[-3] d8[-5] d20[+3] \
-            - multiple dice, multiple rolls: d12[+3] 3d6[-2] 4d8[+5] \
-            - co-co-combo: d10 5d10[-2] 2d100 date d123[+5] Ed10[-2]","""
-
-cmd_usage = {
-    "rolls": "dice_1 [dice_2 ... dice_n]"
+    "user_stat": f"Show user's statistics."
 }
 
 @bot.event
@@ -131,7 +121,8 @@ async def on_command_error(ctx: discord.ApplicationContext, error):
 
 # USER COMMANDS AND ERRORS HANDLERS
 # JOKE COMMAND
-@bot.slash_command(name="joke", description=cmd_description["joke"], guild_ids=[const_guild_id])
+# @bot.slash_command(name="joke", description=cmd_description["joke"], guild_ids=[const_guild_id])
+@bot.slash_command(name="joke", description=cmd_description["joke"])
 async def joke(ctx: discord.ApplicationContext):
     random_joke_number = random.randint(1, number_of_jokes)
     sql_joke = "SELECT joke_text FROM jokes WHERE joke_id=?;"
@@ -359,7 +350,8 @@ async def update_jokes():
     return number_of_jokes
 
 # Individual roll stat command
-@bot.slash_command(name="user_stat", description=cmd_description["user_stat"], guild_ids=[const_guild_id])
+# @bot.slash_command(name="user_stat", description=cmd_description["user_stat"], guild_ids=[const_guild_id])
+@bot.slash_command(name="user_stat", description=cmd_description["user_stat"])
 async def user_stat(ctx: discord.ApplicationContext):
     db = next(get_db())
     guild_id = str(ctx.guild_id)
@@ -377,7 +369,8 @@ async def user_stat(ctx: discord.ApplicationContext):
         await ctx.respond(f'```Roll count: {roll_stat.count_successful_rolls}\nCumulative roll sum: {roll_stat.sum_successful_rolls}```')
 
 # ROLLS COMMAND
-@bot.slash_command(name="rolls", description=cmd_description["rolls"], guild_ids=[const_guild_id])
+# @bot.slash_command(name="rolls", description=cmd_description["rolls"], guild_ids=[const_guild_id])
+@bot.slash_command(name="rolls", description=cmd_description["rolls"])
 async def rolls(ctx: discord.ApplicationContext, roll_string: str):
     db = next(get_db())
 

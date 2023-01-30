@@ -1,0 +1,21 @@
+version: "3.7"
+services:
+  db:
+    image: postgres:15.1-alpine
+    restart: unless-stopped
+    env_file:
+      - .env-docker
+    volumes:
+      - ./db:/var/lib/postgresql/data
+    ports:
+      - "8001:5432"
+  main:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - 'db'
+    env_file:
+      - .env-docker
+    volumes:
+      - .:/main
