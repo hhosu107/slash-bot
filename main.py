@@ -82,35 +82,6 @@ async def hello(ctx: discord.ApplicationContext):
                    f'Please, ask "/help" to list commands with short description. '
                    f'Also, ask "/help <command_name>" for more info about each command and examples.')
 
-"""
-@dice_bot.command(name = "help", description="Command descriptions")
-async def help(ctx: discord.ApplicationContext, args: str):
-    help_embed = discord.Embed(title="dice-bot's help")
-    command_names_list = [x.name for x in bot.commands]
-    if not args:
-        help_embed.add_field(
-            name="List of supported commands:",
-            value="\n".join([f"{i + 1}. {x.name}" for i, x in enumerate(bot.commands)]),
-            inline=False
-        )
-        help_embed.add_field(
-            name="Details",
-            value="Type `/help <command name>` for more details about each command.",
-            inline=False
-        )
-    elif args in command_names_list:
-        help_embed.add_field(
-            name=args,
-            value=dice_bot.get_command
-        )
-    else:
-        help_embed.add_field(
-            name="Unknown command.",
-            value="Unknown command."
-        )
-    await ctx.respond(embed=help_embed)
-"""
-
 # wrong commands handler
 
 @bot.event
@@ -144,7 +115,6 @@ limits = {
     "edge": 1000000000,
     "mod": 1000000000,
     "adds": 10,
-    "roll": 50
 }
 
 # FUNCTIONS
@@ -217,7 +187,7 @@ def ident_dice(dice):
         dice_rolls = 1
     dice_rolls = check_int(dice_rolls)
     check_one(dice_rolls)
-    check_limit(dice_rolls, limits["roll"])
+    check_limit(dice_rolls, limits["dice"])
     dice_edge = check_int(dice_edge)
     check_one(dice_edge)
     check_limit(dice_edge, limits["edge"])
