@@ -1,0 +1,24 @@
+name: Issue to Markdown
+on:
+  issues:
+    types:
+      - labeled
+      - edited
+
+jobs:
+  issue_to_markdown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: eunjae-lee/issue-to-markdown@v0.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: Update README.md
+          commit_options: '--no-verify'
+          commit_user_name: GitHub Actions
+          commit_user_email: github-actions[bot]@users.noreply.github.com
+          commit_author: GitHub Actions <github-actions[bot]@users.noreply.github.com>
