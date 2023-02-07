@@ -11,10 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
       - uses: eunjae-lee/issue-to-markdown@v0.0.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: Update README.md
