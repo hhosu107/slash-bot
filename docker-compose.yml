@@ -2,7 +2,7 @@ version: "3.7"
 services:
   db:
     image: postgres:15.1-alpine
-    restart: unless-stopped
+    restart: always
     env_file:
       - .env-docker
     volumes:
