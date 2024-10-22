@@ -1,5 +1,5 @@
 # Official python version
-FROM python:3.11.1-alpine
+FROM python:3.13.0-alpine
 
 # Set the working directory
 WORKDIR /app
