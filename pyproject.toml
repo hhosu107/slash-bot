@@ -18,7 +18,7 @@ dependencies = [
     "multidict==6.1.0",
     "propcache==0.2.0",
     "psycopg2-binary==2.9.10",
-    "py-cord==2.6.1",
+    "py-cord[speed]==2.6.1",
     "pydantic-core==2.23.4",
     "pydantic==2.9.2",
     "python-dotenv==1.0.1",

@@ -1,5 +1,5 @@
 # Official python version
-FROM python:3.13.0-alpine
+FROM python:3.12.7-slim-bookworm
 
 # Set the working directory
 WORKDIR /app
